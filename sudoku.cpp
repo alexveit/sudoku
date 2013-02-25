@@ -48,12 +48,12 @@ public:
 	
 	void print_puzzle()
 	{
-        for(int i = 0; i < SIZE; i++)
-        {
+		for(int i = 0; i < SIZE; i++)
+		{
 			for(int j = 0; j < SIZE; j++)
 				cout << _rows[i][j] << " ";
 			cout << endl;
-        }
+		}
 	}
 	
 private:
@@ -75,21 +75,21 @@ private:
 	
 	int get_int_value(char c)
 	{
-        int val = 0;
-        switch(c)
-        {
-        case '1': val = 1; break;
-        case '2': val = 2; break;
-        case '3': val = 3; break;
-        case '4': val = 4; break;
-        case '5': val = 5; break;
-        case '6': val = 6; break;
-        case '7': val = 7; break;
-        case '8': val = 8; break;
-        case '9': val = 9; break;
-        }
-        return val;
-    }
+		int val = 0;
+		switch(c)
+		{
+		case '1': val = 1; break;
+		case '2': val = 2; break;
+		case '3': val = 3; break;
+		case '4': val = 4; break;
+		case '5': val = 5; break;
+		case '6': val = 6; break;
+		case '7': val = 7; break;
+		case '8': val = 8; break;
+		case '9': val = 9; break;
+		}
+		return val;
+	}
 	
 	bool is_valid_puzzle()
 	{
