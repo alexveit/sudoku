@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <vector>
 
 using namespace std;
 
@@ -51,6 +52,7 @@ public:
 		if(!is_puzzle_solved())
 		{
 			do_obvious_check();
+			do_single_position_check();
 		}
 		return true;
 	}
@@ -73,6 +75,26 @@ private:
 	int _cells[RC_SIZE][RC_SIZE];
 	string err_msg;
 	
+	//this inner class encapsulates row and column coordinates
+	class coord
+	{
+	public:
+	
+		coord() { _row = _col = 0; }
+		
+		coord(int row, int col) : _row(row), _col(col) {}
+	
+		coord& operator= (const coord& param)
+		{
+			_row=param._row;
+			_col=param._col;
+			return *this;
+		}
+		
+		int _row;
+		int _col;
+	};
+	
 	//this method iterates through the whole puzzle calling
 	//obvious_row_check(i);
 	//obvious_col_check(i);
@@ -90,6 +112,93 @@ private:
 				updated_puzzle = true;
 		}
 		return updated_puzzle;
+	}
+	
+	//this method iterates over the whole puzzle calling
+	//row_single_position_check(i);
+	//col_single_position_check(i);
+	//sector_single_position_check(i);
+	bool do_single_position_check()
+	{
+		for(int i = 0; i < RC_SIZE; i++)
+		{
+			row_single_position_check(i);
+		}
+		return true;
+	}
+	
+	
+	bool row_single_position_check(int row)
+	{
+		vector<int> nums;
+		
+		for(int c = 0; c < RC_SIZE; c++)
+		{
+			if(_cells[row][c]!=0)
+				nums.push_back(_cells[row][c]);
+		}
+		for(int c = 0; c < RC_SIZE; c++)
+		{
+			vector<int> potentials;
+			if(_cells[row][c]==0)
+			{
+				for(int val = 1; val < RC_SIZE+1; val++)
+				{
+					if(!contains(nums,val))
+					{
+						coord cor = get_sector_coordinate(row,c);
+						does_col_conatin_value(c,val);
+						
+					}
+				}
+			}
+		}
+		return true;
+	}
+	
+	//returns a coord object of a given row & column
+	//this object will contain the first cell from left to right
+	//top to bottom of a sector
+	coord get_sector_coordinate(int row, int col)
+	{
+		coord cor;
+		if(row >= 0 && row < 3)
+			cor._row = 0;
+		else if(row >= 3 && row < 6)
+			cor._row = 3;
+		else
+			cor._row = 6;
+		
+		if(col >= 0 && col < 3)
+			cor._col = 0;
+		else if(col >= 3 && col < 6)
+			cor._col = 3;
+		else
+			cor._col = 6;
+		
+		return cor;
+	}
+	
+	//determines if a the given column of _cells has the value
+	bool does_col_conatin_value(int col, int value)
+	{
+		for(int r = 0; r < RC_SIZE; r++)
+		{
+			if(_cells[r][col]==value)
+				return true;
+		}
+		return false;
+	}
+	
+	//determines if the given vector contains the given value
+	bool contains(const vector<int>& v, int val)
+	{
+		for(unsigned i = 0; i < v.size(); i++)
+		{
+			if(v[i] == val)
+				return true;
+		}
+		return false;
 	}
 	
 	//this method checks to see if the row of index "int row"
@@ -276,6 +385,14 @@ private:
 	bool is_valid_quadrant(int quad_row, int quad_col)
 	{
 		int vals[9];
+		populate_quad_values(vals,quad_row,quad_col);
+		return is_valid_row(vals,true);
+	}
+	
+	
+	//populates the values of a quadrant based on the row and column
+	void populate_quad_values(int *vals, int quad_row, int quad_col)
+	{
 		int index = 0;
 		for(int r = quad_row; r < quad_row+SECTOR_SIZE; r++)
 		{
@@ -285,7 +402,6 @@ private:
 				index++;
 			}
 		}
-		return is_valid_row(vals,true);
 	}
 };
 
