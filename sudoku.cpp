@@ -4,19 +4,32 @@
 
 using namespace std;
 
+//class responsable for solving a sudoku puzzle
 class sudoku_puzzle
 {
 
-#define RC_SIZE       	9	// size of row and column
-#define SECTOR_SIZE   	3	// size of sector
-#define RCS_SUM			45	// this is the sum of any full row, col, or sector
+#define	RCS_SIZE		9	// size of a row, column, or sector
+#define	TOP_LEFT		0	// top left sector
+#define	TOP_MID			1	// top middle sector
+#define	TOP_RIGHT		2	// top right sector
+#define	MID_LEFT		3	// middle left sector
+#define	MID_MID			4	// middle middle sector
+#define	MID_RIGHT		5	// middle right sector
+#define	BOTTOM_LEFT		6	// bottom left sector
+#define	BOTTOM_MID		7	// bottom middle sector
+#define	BOTTOM_RIGHT	8	// bottom right sector
 
 public:
-	//constructs a sudoku_puzzle populating it's puzzle from a given file
+
+	//constructs a sudoku_puzzle object
+	//populating it's cells from a given file
 	sudoku_puzzle(char *file)
 	{
 		string row;
-		ifstream myfile (file);
+		ifstream myfile(file);
+		
+		set_cell_coordinates();
+		
 		int index = 0;
 		if (myfile.is_open())
 		{
@@ -36,8 +49,8 @@ public:
 		}
 		else
 		{
-			err_msg = file;
-			err_msg.append(" does not exist");
+			_err_msg = file;
+			_err_msg.append(" does not exist");
 			_good_file = false;
 		}
 	}
@@ -49,10 +62,13 @@ public:
 			return false;
 		if(!is_valid_puzzle())
 			return false;
-		if(!is_puzzle_solved())
+		int iter = 10000;
+		while(!is_puzzle_solved())
 		{
-			do_obvious_check();
-			do_single_position_check();
+			update_cells_according_to_potentials();
+			iter--;
+			if(iter == 0)
+				break;
 		}
 		return true;
 	}
@@ -60,134 +76,132 @@ public:
 	//prints the state of the puzzle
 	void print_puzzle()
 	{
-		for(int i = 0; i < RC_SIZE; i++)
+		for(int r = 0; r < RCS_SIZE; r++)
 		{
-			for(int j = 0; j < RC_SIZE; j++)
-				cout << _cells[i][j] << " ";
+			for(int c = 0; c < RCS_SIZE; c++)
+				cout << _cells[r][c]._value << " ";
 			cout << endl;
 		}
 	}
 	
-	string get_err_msg() { return err_msg; }
+	//prints the last error message
+	string get_err_msg() { return _err_msg; }
 	
 private:
-	bool _good_file;
-	int _cells[RC_SIZE][RC_SIZE];
-	string err_msg;
-	
-	//this inner class encapsulates row and column coordinates
-	class coord
+
+	//represents a cell in the puzzle
+	class cell
 	{
 	public:
-	
-		coord() { _row = _col = 0; }
+		int _value, _sector, _position, _row, _col;
+		vector<int> _potential_values;
 		
-		coord(int row, int col) : _row(row), _col(col) {}
-	
-		coord& operator= (const coord& param)
+		bool is_same_coordinates(int sec, int pos)
 		{
-			_row=param._row;
-			_col=param._col;
-			return *this;
+			return (sec == _sector && pos == _position);
 		}
-		
-		int _row;
-		int _col;
 	};
 	
-	//this method iterates through the whole puzzle calling
-	//obvious_row_check(i);
-	//obvious_col_check(i);
-	bool do_obvious_check()
-	{
-		bool updated_puzzle = false;
-		bool temp_result = false;
-		for(int i = 0; i < RC_SIZE; i++)
-		{
-			temp_result = obvious_row_check(i);
-			if(!updated_puzzle && temp_result)
-				updated_puzzle = true;
-			temp_result = obvious_col_check(i);
-			if(!updated_puzzle && temp_result)
-				updated_puzzle = true;
-		}
-		return updated_puzzle;
-	}
+	bool 	_good_file;
+	string	_err_msg;
+	cell	_cells[9][9];
 	
-	//this method iterates over the whole puzzle calling
-	//row_single_position_check(i);
-	//col_single_position_check(i);
-	//sector_single_position_check(i);
-	bool do_single_position_check()
+	//sets the sector, position, row, and column in each cell
+	void set_cell_coordinates()
 	{
-		for(int i = 0; i < RC_SIZE; i++)
+		int position = 0, offset = 0;
+		for(int r = 0; r < RCS_SIZE; r++)
 		{
-			row_single_position_check(i);
-		}
-		return true;
-	}
-	
-	
-	bool row_single_position_check(int row)
-	{
-		vector<int> nums;
-		
-		for(int c = 0; c < RC_SIZE; c++)
-		{
-			if(_cells[row][c]!=0)
-				nums.push_back(_cells[row][c]);
-		}
-		for(int c = 0; c < RC_SIZE; c++)
-		{
-			vector<int> potentials;
-			if(_cells[row][c]==0)
+			for(int c = 0; c < RCS_SIZE; c++)
 			{
-				for(int val = 1; val < RC_SIZE+1; val++)
+				if((r >= 0 && r < 3) && (c >= 0 && c < 3))
+					_cells[r][c]._sector = TOP_LEFT;
+				else if((r >= 0 && r < 3) && (c >= 3 && c < 6))
+					_cells[r][c]._sector = TOP_MID;
+				else if((r >= 0 && r < 3) && (c >= 6 && c < 9))
+					_cells[r][c]._sector = TOP_RIGHT;
+				else if((r >= 3 && r < 6) && (c >= 0 && c < 3))
+					_cells[r][c]._sector = MID_LEFT;
+				else if((r >= 3 && r < 6) && (c >= 3 && c < 6))
+					_cells[r][c]._sector = MID_MID;
+				else if((r >= 3 && r < 6) && (c >= 6 && c < 9))
+					_cells[r][c]._sector = MID_RIGHT;
+				else if((r >= 6 && r < 9) && (c >= 0 && c < 3))
+					_cells[r][c]._sector = BOTTOM_LEFT;
+				else if((r >= 6 && r < 9) && (c >= 3 && c < 6))
+					_cells[r][c]._sector = BOTTOM_MID;
+				else if((r >= 6 && r < 9) && (c >= 6 && c < 9))
+					_cells[r][c]._sector = BOTTOM_RIGHT;
+				
+				_cells[r][c]._position = position + offset;
+				_cells[r][c]._row = r;
+				_cells[r][c]._col = c;
+				position++;
+				if(position == 3)
+					position = 0;
+				
+			}
+			offset += 3;
+			if(offset == 9)
+				offset = 0;
+		}
+	}
+	
+	//this is the one of the cores of the puzzle salving
+	//the reason why it is "one of the cores" is because
+	//this method is just smart enough to solve simple puzzles
+	//for that reason i might implement more core algorithms in the future
+	//
+	//this method keeps track of potential values that can go in each cell
+	//based on the sector, row, and column from which the cell belongs
+	void update_cells_according_to_potentials()
+	{
+		vector<int> sec_missing_vals;
+		for(int sec = 0; sec < RCS_SIZE; sec++)
+		{
+			sec_missing_vals = get_sector_missing_values(sec);
+			for(int pos = 0; pos < RCS_SIZE; pos++)
+			{
+				cell *mycell = get_cell(sec,pos);
+				mycell->_potential_values.clear();
+				if(mycell->_value == 0)
 				{
-					if(!contains(nums,val))
+					for(int i = 0; i < sec_missing_vals.size(); i++)
 					{
-						coord cor = get_sector_coordinate(row,c);
-						does_col_conatin_value(c,val);
-						
+						if(!does_row_conatin_value(mycell, sec_missing_vals[i]) &&
+							!does_col_conatin_value(mycell,sec_missing_vals[i]))
+						{
+							mycell->_potential_values.push_back(sec_missing_vals[i]);
+						}
 					}
+				}
+				if(mycell->_potential_values.size() == 1)
+					mycell->_value = mycell->_potential_values[0];
+			}
+		}
+	}
+	
+	//retrieves a vector with the missing values of the sector
+	vector<int> get_sector_missing_values(int sector)
+	{
+		vector<int> vals;
+		vector<int> missing_vals;
+		for(int r = 0; r < RCS_SIZE; r++)
+		{
+			for(int c = 0; c < RCS_SIZE; c++)
+			{
+				if(_cells[r][c]._sector == sector && _cells[r][c]._value != 0)
+				{
+					vals.push_back(_cells[r][c]._value);
 				}
 			}
 		}
-		return true;
-	}
-	
-	//returns a coord object of a given row & column
-	//this object will contain the first cell from left to right
-	//top to bottom of a sector
-	coord get_sector_coordinate(int row, int col)
-	{
-		coord cor;
-		if(row >= 0 && row < 3)
-			cor._row = 0;
-		else if(row >= 3 && row < 6)
-			cor._row = 3;
-		else
-			cor._row = 6;
-		
-		if(col >= 0 && col < 3)
-			cor._col = 0;
-		else if(col >= 3 && col < 6)
-			cor._col = 3;
-		else
-			cor._col = 6;
-		
-		return cor;
-	}
-	
-	//determines if a the given column of _cells has the value
-	bool does_col_conatin_value(int col, int value)
-	{
-		for(int r = 0; r < RC_SIZE; r++)
+		for(int i = 1; i < RCS_SIZE+1; i++)
 		{
-			if(_cells[r][col]==value)
-				return true;
+			if(!contains(vals,i))
+				missing_vals.push_back(i);
 		}
-		return false;
+		return missing_vals;
 	}
 	
 	//determines if the given vector contains the given value
@@ -201,83 +215,71 @@ private:
 		return false;
 	}
 	
-	//this method checks to see if the row of index "int row"
-	//has only one empty cell, if so it identifies the empty cell, then
-	//assignes the proper number and returns true signaling that a cell has
-	//been updated, otherwise it returns false
-	bool obvious_row_check(int row)
+	//determines if a row of the puzzle has the value 
+	//contained in the given cell based in the cell's row
+	bool does_row_conatin_value(cell *cel, int value)
 	{
-		int empty_cells = 0;
-		int empty_index = 0;
-		for(int c = 0; c < RC_SIZE; c++)
+		for(int c = 0; c < RCS_SIZE; c++)
 		{
-			if(_cells[row][c]==0)
-			{
-				empty_cells++;
-				empty_index = c;
-			}
-			if(empty_cells > 1)
-				return false;
+			if(_cells[cel->_row][c]._value == value)
+				return true;
 		}
-		if(empty_cells==0)
-			return false;
-			
-		int final_val = RCS_SUM;
-		for(int c = 0; c < RC_SIZE; c++)
-		{
-			final_val -= _cells[row][c];
-		}
-		_cells[row][empty_index] = final_val;
-		return true;
+		return false;
 	}
 	
-	//this method checks to see if the column of index "int col"
-	//has only one empty cell, if so it identifies the empty cell, then
-	//assignes the proper number and returns true signaling that a cell has
-	//been updated, otherwise it returns false
-	bool obvious_col_check(int col)
+	//determines if a column of the puzzle has the value 
+	//contained in the given cell based in the cell's column
+	bool does_col_conatin_value(cell *cel, int value)
 	{
-		int empty_cells = 0;
-		int empty_index = 0;
-		for(int r = 0; r < RC_SIZE; r++)
+		for(int r = 0; r < RCS_SIZE; r++)
 		{
-			if(_cells[r][col]==0)
+			if(_cells[r][cel->_col]._value == value)
+				return true;
+		}
+		return false;
+	}
+	
+	//returns a pointer to a cell based on puzzle coordinates
+	//e.g. sector & position
+	cell* get_cell(int sec, int pos)
+	{
+		for(int r = 0; r < RCS_SIZE; r++)
+		{
+			for(int c = 0; c < RCS_SIZE; c++)
 			{
-				empty_cells++;
-				empty_index = r;
+				if(_cells[r][c].is_same_coordinates(sec,pos))
+					return &_cells[r][c];
 			}
-			if(empty_cells > 1)
-				return false;
 		}
-		if(empty_cells==0)
-			return false;
-			
-		int final_val = RCS_SUM;
-		for(int r = 0; r < RC_SIZE; r++)
-		{
-			final_val -= _cells[r][col];
-		}
-		_cells[empty_index][col] = final_val;
+	}
+	
+	//checks if the puzzle has emptry cells (cells with 0)
+	bool is_puzzle_solved()
+	{
+		for(int c = 0; c < RCS_SIZE; c++)
+			for(int r = 0; r < RCS_SIZE; r++)
+				if(_cells[r][c]._value == 0)
+					return false;
 		return true;
 	}
 	
 	//parse a string to set a row of the puzzle at position index
 	bool set_row(string &row, int index)
 	{
-		if(row.size() != RC_SIZE)
+		if(row.size() != RCS_SIZE)
 		{
-			err_msg =  "invalid row lenght";
+			_err_msg =  "invalid row lenght";
 			return false;
 		}
-		for(unsigned i = 0; i < row.size(); i++)
+		for(unsigned c = 0; c < row.size(); c++)
 		{
-			if(!isdigit(row[i]))
+			if(!isdigit(row[c]))
 				return false;
-			_cells[index][i] = get_int_value(row[i]);
+			_cells[index][c]._value = get_int_value(row[c]);
 		}
 		return true;
 	}
-	
+
 	//get integer value represented by char c
 	int get_int_value(char c)
 	{
@@ -297,57 +299,39 @@ private:
 		return val;
 	}
 	
-	//checks if the puzzle has emptry cells (cells with 0)
-	bool is_puzzle_solved()
-	{
-		for(int c = 0; c < RC_SIZE; c++)
-			for(int r = 0; r < RC_SIZE; r++)
-				if(_cells[r][c]==0)
-					return false;
-		return true;
-	}
-	
 	//validates the whole puzzle
 	bool is_valid_puzzle()
 	{
-		int row = 0, col = 0;
-		for(int i = 0; i < RC_SIZE; i++)
+		for(int i = 0; i < RCS_SIZE; i++)
 		{
 			if(!is_valid_row(_cells[i],false))
 				return false;
 			if(!is_valid_column(i))
 				return false;
-			if(!is_valid_quadrant(row,col))
+			if(!is_valid_sector(i))
 				return false;
-			col+=SECTOR_SIZE;
-			if(col==RC_SIZE)
-			{
-				col=0;
-				row+=SECTOR_SIZE;
-			}
 		}
-		
 		return true;
 	}
 	
-	//validates a row in a given array of ints
-	//a valid row is one that does not have repeted numbers
-	//except for 0 with denotes an empty cell
-	//the paramater isquad is just to better address the error msg
-	bool is_valid_row(int *row, bool isquad)
+	//validates the row in a given array of cells
+	//a valid row is one that does not have repeated numbers
+	//except for 0 which denotes an empty cell
+	//the paramater issector is just to better address the error msg
+	bool is_valid_row(cell *row, bool issector)
 	{
-		for(int i = 0; i < RC_SIZE; i++)
+		for(int i = 0; i < RCS_SIZE; i++)
 		{
-			if(row[i] != 0)
+			if(row[i]._value != 0)
 			{
-				for(int j = RC_SIZE-1; j > i; j--)
+				for(int j = RCS_SIZE-1; j > i; j--)
 				{
-					if(row[i] == row[j])
+					if(row[i]._value == row[j]._value)
 					{
-						if(isquad)
-							err_msg = "the puzzle contains invalid quadrant(s)";
+						if(issector)
+							_err_msg = "the puzzle contains invalid sector(s)";
 						else
-							err_msg = "the puzzle contains invalid row(s)";
+							_err_msg = "the puzzle contains invalid row(s)";
 						return false;
 					}
 				}
@@ -357,19 +341,19 @@ private:
 	}
 	
 	//validates a column in _cells
-	//a valid column is one that does not have repeted numbers
+	//a valid column is one that does not have repeated numbers
 	//except for 0 with denotes an empty cell
 	bool is_valid_column(int col)
 	{
-		for(int i = 0; i < RC_SIZE; i++)
+		for(int i = 0; i < RCS_SIZE; i++)
 		{
-			if(_cells[i][col] != 0)
+			if(_cells[i][col]._value != 0)
 			{
-				for(int j = RC_SIZE-1; j > i; j--)
+				for(int j = RCS_SIZE-1; j > i; j--)
 				{
-					if(_cells[i][col] == _cells[j][col])
+					if(_cells[i][col]._value == _cells[j][col]._value)
 					{
-						err_msg = "the puzzle contains invalid column(s)";
+						_err_msg = "the puzzle contains invalid column(s)";
 						return false;
 					}
 				}
@@ -380,26 +364,28 @@ private:
 	
 	//validates a sector in _cells
 	//a sector is a 3x3 square
-	//a valid sector is one that does not have repeted numbers
+	//a valid sector is one that does not have repeated numbers
 	//except for 0 with denotes an empty cell
-	bool is_valid_quadrant(int quad_row, int quad_col)
+	bool is_valid_sector(int sector)
 	{
-		int vals[9];
-		populate_quad_values(vals,quad_row,quad_col);
+		cell vals[9];
+		populate_sector_values(vals,sector);
 		return is_valid_row(vals,true);
 	}
 	
-	
-	//populates the values of a quadrant based on the row and column
-	void populate_quad_values(int *vals, int quad_row, int quad_col)
+	//populates the values of a quadrant in a 1D array of cells
+	void populate_sector_values(cell *vals, int sector)
 	{
 		int index = 0;
-		for(int r = quad_row; r < quad_row+SECTOR_SIZE; r++)
+		for(int r = 0; r < RCS_SIZE; r++)
 		{
-			for(int c = quad_col; c < quad_col+SECTOR_SIZE; c++)
+			for(int c = 0; c < RCS_SIZE; c++)
 			{
-				vals[index] = _cells[r][c];
-				index++;
+				if(_cells[r][c]._sector == sector)
+				{
+					vals[index]._value = _cells[r][c]._value;
+					index++;
+				}
 			}
 		}
 	}
