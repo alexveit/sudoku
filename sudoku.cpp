@@ -79,7 +79,12 @@ public:
 		for(int r = 0; r < RCS_SIZE; r++)
 		{
 			for(int c = 0; c < RCS_SIZE; c++)
-				cout << _cells[r][c]._value << " ";
+			{
+				if(_cells[r][c]._value == 0) 
+					cout << " " << " ";
+				else
+					cout << _cells[r][c]._value << " ";
+			}
 			cout << endl;
 		}
 	}
@@ -176,7 +181,10 @@ private:
 					}
 				}
 				if(mycell->_potential_values.size() == 1)
+				{
 					mycell->_value = mycell->_potential_values[0];
+					mycell->_potential_values.clear();
+				}
 			}
 		}
 	}
