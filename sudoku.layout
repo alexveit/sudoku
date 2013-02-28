@@ -7,11 +7,11 @@ Open=0
 Top=0
 [Editors]
 Focused=0
-Order=0
+Order=
 [Editor_0]
-Open=1
-Top=1
-CursorCol=33
-CursorRow=86
-TopLine=49
+Open=0
+Top=0
+CursorCol=2
+CursorRow=158
+TopLine=154
 LeftChar=1
