@@ -68,12 +68,14 @@ public:
 			return false;
 		
 		int iter = 100;
-		while(!is_puzzle_solved() && iter > 0)
+		while(iter > 0)
 		{
 			update_cells_according_to_potentials();
 			if(is_puzzle_solved())
 				break;
 			update_cells_single_position();
+			if(is_puzzle_solved())
+				break;
 			iter--;
 		}
 
@@ -187,6 +189,8 @@ private:
 
 //-- methods pertinent to the actual puzzle solving start here --------------------------------
 
+//-- potential values update methods start here -----------------------------------------------
+
 	//updates the potential values that can be assigned to each cell
 	void update_potentials()
 	{
@@ -211,7 +215,157 @@ private:
 				}
 			}
 		}
+		update_candidate_lines_potentials();
 	}
+
+	//this methods identifies cells that are adjacent to ench other
+	//and that have a same particular potential value
+	//if there are such adjacent cell the method checks if
+	//the rest of the sctor has that particular value
+	//if not it deletes that particular value from the rest of the 
+	//row or column that is not part of that sector
+	void update_candidate_lines_potentials()
+	{
+		for(int sec = 0; sec < RCS_SIZE; sec++)
+		{
+			for(int pos = 0; pos < RCS_SIZE; pos++)
+			{
+				cell *cel = _cell_sectors[sec][pos];
+				if(cel->_value == 0)
+				{
+					for(unsigned i = 0; i < cel->_potential_values.size(); i++)
+					{
+						vector<cell*> candidates = get_cells_with_same_potential_value(cel,i);
+						for(unsigned j = 0; j < candidates.size(); j++)
+						{
+							if(candidates[j]->_row == cel->_row)
+							{
+								if(!do_other_cells_in_this_sector_but_dif_rows_have_same_potential_value(cel,i))
+								{
+									remove_potential_from_rest_of_row(cel,i);
+								}
+							}
+							else if(candidates[j]->_col == cel->_col)
+							{
+								if(!do_other_cells_in_this_sector_but_dif_cols_have_same_potential_value(cel,i))
+								{
+									remove_potential_from_rest_of_col(cel,i);
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	//this method removes a potential value given by cel->_potential_values[pindex]
+	//from the rest of the row that is not from the same sector
+	void remove_potential_from_rest_of_row(cell *cel, int pindex)
+	{
+		for(int c = 0; c < RCS_SIZE; c++)
+		{
+			if(_cells[cel->_row][c]._value == 0 && _cells[cel->_row][c]._sector != cel->_sector)
+			{
+				remove_value_from_vector(cel->_row,c,cel->_potential_values[pindex]);
+			}
+		}
+	}
+
+	//this method removes a potential value given by cel->_potential_values[pindex]
+	//from the rest of the col that is not from the same sector
+	void remove_potential_from_rest_of_col(cell *cel, int pindex)
+	{
+		for(int r = 0; r < RCS_SIZE; r++)
+		{
+			if(_cells[r][cel->_col]._value == 0 && _cells[r][cel->_col]._sector != cel->_sector)
+			{
+				remove_value_from_vector(r,cel->_col,cel->_potential_values[pindex]);
+			}
+		}
+	}
+
+	//this method does the actual value removing from a given vector
+	//determined by the cell's row & column
+	void remove_value_from_vector(int row, int col, int value)
+	{
+		int index = get_value_index(_cells[row][col]._potential_values, value);
+		if(index != -1)
+		{
+			_cells[row][col]._potential_values.erase(_cells[row][col]._potential_values.begin()+index);
+		}
+	}
+
+	//returns the index of the value in the vector
+	//otherwise returns -1
+	int get_value_index(const vector<int> &potentials, int value)
+	{
+		for(unsigned i = 0; i < potentials.size(); i++)
+		{
+			if(potentials[i] == value)
+			{
+				return (int)i;
+			}
+		}
+		return -1;
+	}
+
+	//determines if the rest of cells in same sector as cel->_sector 
+	//but on different rows have the same potential value given by cel->_potential_values[pindex]
+	bool do_other_cells_in_this_sector_but_dif_rows_have_same_potential_value(cell *cel, int pindex)
+	{
+		for(int pos = 0; pos < RCS_SIZE; pos++)
+		{
+			cell *tmp = _cell_sectors[cel->_sector][pos];
+			if(tmp->_value == 0 && tmp->_row != cel->_row)
+			{
+				if(contains(tmp->_potential_values,cel->_potential_values[pindex]))
+				{
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	//determines if the rest of cells in same sector as cel->_sector 
+	//but on different cols have the same potential value given by cel->_potential_values[pindex]
+	bool do_other_cells_in_this_sector_but_dif_cols_have_same_potential_value(cell *cel, int pindex)
+	{
+		for(int pos = 0; pos < RCS_SIZE; pos++)
+		{
+			cell *tmp = _cell_sectors[cel->_sector][pos];
+			if(tmp->_value == 0 && tmp->_col != cel->_col)
+			{
+				if(contains(tmp->_potential_values,cel->_potential_values[pindex]))
+				{
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	//returns a vector of cell* the same sector as cel->sector that have the same 
+	//potential value given by cel->_potential_values[pindex]
+	vector<cell*> get_cells_with_same_potential_value(cell *cel, int pindex)
+	{
+		vector<cell*> candidates;
+		for(int pos = 0; pos < RCS_SIZE; pos++)
+		{
+			cell *tmp = _cell_sectors[cel->_sector][pos];
+			if(tmp->_value == 0 && tmp->_position != cel->_position)
+			{
+				if(contains(tmp->_potential_values,cel->_potential_values[pindex]))
+				{
+					candidates.push_back(tmp);
+				}
+			}
+		}
+		return candidates;
+	}
+
+//-- potential values update methods ends here ------------------------------------------------
 
 	//this method evaluates the potential values in each sector
 	//if there is a cell that has a potential values that is
@@ -347,6 +501,8 @@ private:
 		return true;
 	}
 
+//-- methods pertinent to the actual puzzle solving end here ----------------------------------
+	
 //-- puzzle initialization methods start here -------------------------------------------------
 
 	//sets the sector, position, row, and column in each cell
@@ -427,6 +583,8 @@ private:
 		return val;
 	}
 
+//-- puzzle initialization methods end here ---------------------------------------------------
+
 //-- puzzle validation methods start here -----------------------------------------------------
 
 	//validates the whole puzzle
@@ -495,7 +653,6 @@ private:
 	//except for 0 with denotes an empty cell
 	bool is_valid_sector(int sector)
 	{
-		cell vals[9];
 		for(int c = 0; c < RCS_SIZE; c++)
 		{
 			if(_cell_sectors[sector][c]->_value != 0)
@@ -512,6 +669,8 @@ private:
 		}
 		return true;
 	}
+	
+//-- puzzle validation methods end here -------------------------------------------------------
 };
 
 //program entry point to solve a sudoku puzzle
