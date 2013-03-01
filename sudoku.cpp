@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -65,14 +66,17 @@ public:
 			return false;
 		if(!is_valid_puzzle())
 			return false;
-		int iter = 1000;
-		while(!is_puzzle_solved())
+		
+		int iter = 100;
+		while(!is_puzzle_solved() && iter > 0)
 		{
 			update_cells_according_to_potentials();
-			iter--;
-			if(iter == 0)
+			if(is_puzzle_solved())
 				break;
+			update_cells_single_position();
+			iter--;
 		}
+
 		return true;
 	}
 
@@ -114,10 +118,54 @@ public:
 						}
 					}
 				}
-				if(_cells[r][c]._potential_values.size() > 0)
-					cout << endl;
+				cout << endl;
 			}
 		}
+
+		print_potentials_to_file();
+
+	}
+
+	void print_potentials_to_file()
+	{
+		ofstream myfile;
+		myfile.open ("C:\\Dev-Cpp\\Projects\\sudoku\\potentials.txt");
+
+		for(int r = 0; r < RCS_SIZE; r++)
+		{
+			for(int c = 0; c < RCS_SIZE; c++)
+			{
+				if(_cells[r][c]._value == 0) 
+					myfile << " " << " ";
+				else
+					myfile << _cells[r][c]._value << " ";
+			}
+			myfile << endl;
+		}
+
+		myfile << endl;
+
+		for(int r = 0; r < RCS_SIZE; r++)
+		{
+			for(int c = 0; c < RCS_SIZE; c++)
+			{
+				char num[5];
+				string line;
+				for(unsigned i = 0; i < _cells[r][c]._potential_values.size(); i++)
+				{
+					itoa(_cells[r][c]._potential_values[i],num,10);
+					line.push_back(num[0]);
+				}
+				myfile << setfill ('-') << setw (10);
+				myfile << setw(10) << left << line;
+				if(c == 2 || c == 5)
+					myfile << "|";
+			}
+			myfile << endl;
+			if(r == 2 || r == 5)
+				myfile << endl;
+		}
+		myfile.close();
 	}
 
 	//prints the last error message
@@ -126,16 +174,10 @@ public:
 private:
 
 	//represents a cell in the puzzle
-	class cell
+	struct cell
 	{
-	public:
 		int _value, _sector, _position, _row, _col;
 		vector<int> _potential_values;
-
-		bool is_same_coordinates(int sec, int pos)
-		{
-			return (sec == _sector && pos == _position);
-		}
 	};
 
 	bool 	_good_file;
@@ -145,36 +187,98 @@ private:
 
 //-- methods pertinent to the actual puzzle solving start here --------------------------------
 
-	//this is the one of the cores of the puzzle salving
-	//the reason why it is "one of the cores" is because
-	//this method is just smart enough to solve simple puzzles
-	//for that reason i might implement more core algorithms in the future
-	//
-	//this method keeps track of potential values that can go in each cell
-	//based on the sector, row, and column from which the cell belongs
-	void update_cells_according_to_potentials()
+	//updates the potential values that can be assigned to each cell
+	void update_potentials()
 	{
 		for(int sec = 0; sec < RCS_SIZE; sec++)
 		{
 			vector<int> sec_missing_vals = get_sector_missing_values(sec);
 			for(int pos = 0; pos < RCS_SIZE; pos++)
 			{
-				_cell_sectors[sec][pos]->_potential_values.clear();
-				if(_cell_sectors[sec][pos]->_value == 0)
+				cell *cell = _cell_sectors[sec][pos]; 	// temp pointer so I dont have to write
+														// _cell_sectors[sec][pos] every time
+				cell->_potential_values.clear();
+				if(cell->_value == 0)
 				{
 					for(unsigned i = 0; i < sec_missing_vals.size(); i++)
 					{
-						if(!does_row_conatin_value(_cell_sectors[sec][pos], sec_missing_vals[i]) &&
-							!does_col_conatin_value(_cell_sectors[sec][pos],sec_missing_vals[i]))
+						if(!does_row_conatin_value(cell, sec_missing_vals[i]) &&
+							!does_col_conatin_value(cell,sec_missing_vals[i]))
 						{
-							_cell_sectors[sec][pos]->_potential_values.push_back(sec_missing_vals[i]);
+							cell->_potential_values.push_back(sec_missing_vals[i]);
 						}
 					}
 				}
-				if(_cell_sectors[sec][pos]->_potential_values.size() == 1)
+			}
+		}
+	}
+
+	//this method evaluates the potential values in each sector
+	//if there is a cell that has a potential values that is
+	//not found in the rest of the sector the method assigns that
+	//potential value to its respective cell and then clears that
+	//cell's potential_values vector because the value has been assigned
+	void update_cells_single_position()
+	{
+		for(int sec = 0; sec < RCS_SIZE; sec++)
+		{
+			for(int pos = 0; pos < RCS_SIZE; pos++)
+			{
+				cell *cel = _cell_sectors[sec][pos];
+				if(cel->_value == 0)
 				{
-					_cell_sectors[sec][pos]->_value = _cell_sectors[sec][pos]->_potential_values[0];
-					_cell_sectors[sec][pos]->_potential_values.clear();
+					vector<int> sec_potentials = get_sector_potentials(sec,pos);
+					for(unsigned i = 0; i < cel->_potential_values.size(); i++)
+					{
+						if(!contains(sec_potentials,cel->_potential_values[i]))
+						{
+							cel->_value = cel->_potential_values[i];
+							cel->_potential_values.clear();
+							update_potentials();
+						}
+					}
+				}
+			}
+		}
+	}
+
+	//this method retrieves a vector with potential values of a given sector
+	//except for the potential values of the given position
+	vector<int> get_sector_potentials(int sector, int position)
+	{
+		vector<int> sector_potentials;
+		for(int pos = 0; pos < RCS_SIZE; pos++)
+		{
+			cell *cel = _cell_sectors[sector][pos];
+			if(cel->_value == 0 && pos != position)
+			{
+				for(unsigned i = 0; i < cel->_potential_values.size(); i++)
+				{
+					if(!contains(sector_potentials,cel->_potential_values[i]))
+					{
+						sector_potentials.push_back(cel->_potential_values[i]);
+					}
+				}
+			}
+		}
+		return sector_potentials;
+	}
+
+	//this metthod assigns a value to the cell acourding to its potential values,
+	//if the potential_values vector only contains one element 
+	//that means only that value can be assigned at that cell
+	void update_cells_according_to_potentials()
+	{
+		update_potentials();
+		for(int r = 0; r < RCS_SIZE; r++)
+		{
+			for(int c = 0; c < RCS_SIZE; c++)
+			{
+				if(_cells[r][c]._potential_values.size() == 1)
+				{
+					_cells[r][c]._value = _cells[r][c]._potential_values[0];
+					_cells[r][c]._potential_values.clear();
+					update_cells_according_to_potentials();
 				}
 			}
 		}
@@ -417,7 +521,6 @@ int main(int argc, char *argv[])
 	if(argc == 1)
 	{
 		cout << "program requires file name as parameter" << endl;
-		system("pause");
 		return 0;
 	}
 
@@ -426,13 +529,10 @@ int main(int argc, char *argv[])
 	if(!sd.solve())
 	{
 		cout << sd.get_err_msg() << endl;
-		system("pause");
 		return 0;
 	}
 
 	sd.print_puzzle();
-
-	system("pause");
 
 	return 1;
 }
