@@ -276,7 +276,7 @@ private:
 	string	_err_msg;
 	cell	_cells[RCS_SIZE][RCS_SIZE];
 	cell	*_cell_sectors[RCS_SIZE][RCS_SIZE];
-	int		_empty_cells;
+	int	_empty_cells;
 	last_good_state _lgs;
 
 //-- methods pertinent to the actual puzzle solving start here --------------------------------
