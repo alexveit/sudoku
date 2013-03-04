@@ -6,6 +6,7 @@
 
 using namespace std;
 
+
 //class responsable for solving a sudoku puzzle
 class sudoku_puzzle
 {
@@ -32,6 +33,8 @@ public:
 		string row;
 		ifstream myfile(file);
 
+		_empty_cells = RCS_SIZE*RCS_SIZE;
+
 		set_cell_coordinates();
 
 		int index = 0;
@@ -39,6 +42,13 @@ public:
 		{
 			while ( myfile.good() )
 			{
+				if(index > RCS_SIZE-1)
+				{
+					_good_file = false;
+					_err_msg = "file has too many rows";
+					myfile.close();
+					return;
+				}
 				getline (myfile,row);
 				if(!set_row(row,index))
 				{
@@ -47,6 +57,13 @@ public:
 					return;
 				}
 				index++;
+			}
+			if(index != 9)
+			{
+				_good_file = false;
+				_err_msg = "file does not have 9 rows";
+				myfile.close();
+				return;
 			}
 			myfile.close();
 			_good_file = true;
@@ -66,18 +83,35 @@ public:
 			return false;
 		if(!is_valid_puzzle())
 			return false;
-		
-		int iter = 100;
-		while(iter > 0)
+		bool cell_assigned[2];
+		bool have_i_guessed = false;
+
+		do
 		{
-			update_cells_according_to_potentials();
-			if(is_puzzle_solved())
-				break;
-			update_cells_single_position();
-			if(is_puzzle_solved())
-				break;
-			iter--;
-		}
+			do
+			{
+				cell_assigned[0] = update_cells_according_to_potentials();
+				if(is_puzzle_solved())
+					break;
+				cell_assigned[1] = update_cells_single_position();
+				if(is_puzzle_solved())
+					break;
+			}while(!is_puzzle_solved() && has_a_cell_been_assigned(cell_assigned, 2));
+
+			if(!is_puzzle_really_solved())
+			{
+				if(have_i_guessed)
+				{
+					_empty_cells = _lgs.revert_back(_cells);
+				}
+				else
+				{
+					_lgs.set_cells(_cells);
+				}
+				make_a_guess();
+				have_i_guessed = true;
+			}
+		}while(!is_puzzle_really_solved());
 
 		return true;
 	}
@@ -128,15 +162,19 @@ public:
 
 	}
 
+	//prints the state of the puzzle to file
 	void print_potentials_to_file()
 	{
+		bool has_potentials = false;
 		ofstream myfile;
-		myfile.open ("C:\\Dev-Cpp\\Projects\\sudoku\\potentials.txt");
+		myfile.open ("potentials.txt");
 
 		for(int r = 0; r < RCS_SIZE; r++)
 		{
 			for(int c = 0; c < RCS_SIZE; c++)
 			{
+				if(!has_potentials && _cells[r][c]._potential_values.size() > 0)
+					has_potentials = true;
 				if(_cells[r][c]._value == 0) 
 					myfile << " " << " ";
 				else
@@ -146,26 +184,28 @@ public:
 		}
 
 		myfile << endl;
-
-		for(int r = 0; r < RCS_SIZE; r++)
+		if(has_potentials)
 		{
-			for(int c = 0; c < RCS_SIZE; c++)
+			for(int r = 0; r < RCS_SIZE; r++)
 			{
-				char num[5];
-				string line;
-				for(unsigned i = 0; i < _cells[r][c]._potential_values.size(); i++)
+				for(int c = 0; c < RCS_SIZE; c++)
 				{
-					itoa(_cells[r][c]._potential_values[i],num,10);
-					line.push_back(num[0]);
+					char num[5];
+					string line;
+					for(unsigned i = 0; i < _cells[r][c]._potential_values.size(); i++)
+					{
+						sprintf(num,"%d",_cells[r][c]._potential_values[i]);
+						line.push_back(num[0]);
+					}
+					myfile << setfill ('-') << setw (10);
+					myfile << setw(10) << left << line;
+					if(c == 2 || c == 5)
+						myfile << "|";
 				}
-				myfile << setfill ('-') << setw (10);
-				myfile << setw(10) << left << line;
-				if(c == 2 || c == 5)
-					myfile << "|";
-			}
-			myfile << endl;
-			if(r == 2 || r == 5)
 				myfile << endl;
+				if(r == 2 || r == 5)
+					myfile << endl;
+			}
 		}
 		myfile.close();
 	}
@@ -179,13 +219,65 @@ private:
 	struct cell
 	{
 		int _value, _sector, _position, _row, _col;
+		bool  _all_possible_guesses_have_been_made;
 		vector<int> _potential_values;
+	};
+
+	// class that represents the last good state of the puzzle
+	class last_good_state
+	{
+	public:
+		int _last_index_checked;
+
+		last_good_state() { _last_index_checked = -1; }
+
+		//sets the state of the puzzle
+		void set_cells(cell cells[RCS_SIZE][RCS_SIZE])
+		{
+			for(int r = 0; r < RCS_SIZE; r++)
+			{
+				for(int c = 0; c < RCS_SIZE; c++)
+				{
+					_cells[r][c]._value = cells[r][c]._value;
+					_cells[r][c]._col = cells[r][c]._col;
+					_cells[r][c]._row = cells[r][c]._row;
+					_cells[r][c]._position = cells[r][c]._position;
+					_cells[r][c]._sector = cells[r][c]._sector;
+					_cells[r][c]._potential_values = cells[r][c]._potential_values;
+					_cells[r][c]._all_possible_guesses_have_been_made = 
+						cells[r][c]._all_possible_guesses_have_been_made;
+				}
+			}
+		}
+
+		//reverts the given 2D cell array to its last good state
+		//then returns an int representing the empty cells count
+		int revert_back(cell cells[RCS_SIZE][RCS_SIZE])
+		{
+			int empty_cells = RCS_SIZE*RCS_SIZE;
+			for(int r = 0; r < RCS_SIZE; r++)
+			{
+				for(int c = 0; c < RCS_SIZE; c++)
+				{
+					cells[r][c]._value = _cells[r][c]._value;
+					cells[r][c]._potential_values = _cells[r][c]._potential_values;
+					if(cells[r][c]._value != 0)
+						empty_cells--;
+				}
+			}
+			return empty_cells;
+		}
+
+	private:
+		cell _cells[RCS_SIZE][RCS_SIZE];
 	};
 
 	bool 	_good_file;
 	string	_err_msg;
-	cell	_cells[9][9];
-	cell	*_cell_sectors[9][9];
+	cell	_cells[RCS_SIZE][RCS_SIZE];
+	cell	*_cell_sectors[RCS_SIZE][RCS_SIZE];
+	int		_empty_cells;
+	last_good_state _lgs;
 
 //-- methods pertinent to the actual puzzle solving start here --------------------------------
 
@@ -367,13 +459,27 @@ private:
 
 //-- potential values update methods ends here ------------------------------------------------
 
+	//iterates through a bool array
+	//returns true if a true value is found
+	//returns false otherwise
+	bool has_a_cell_been_assigned(bool *cell__assigned, int size)
+	{
+		for(int i = 0; i < size; i++)
+		{
+			if(cell__assigned[i])
+				return true;
+		}
+		return false;
+	}
+
 	//this method evaluates the potential values in each sector
 	//if there is a cell that has a potential values that is
 	//not found in the rest of the sector the method assigns that
 	//potential value to its respective cell and then clears that
 	//cell's potential_values vector because the value has been assigned
-	void update_cells_single_position()
+	bool update_cells_single_position()
 	{
+		bool assigned_a_val = false;
 		for(int sec = 0; sec < RCS_SIZE; sec++)
 		{
 			for(int pos = 0; pos < RCS_SIZE; pos++)
@@ -388,12 +494,15 @@ private:
 						{
 							cel->_value = cel->_potential_values[i];
 							cel->_potential_values.clear();
+							_empty_cells--;
+							assigned_a_val = true;
 							update_potentials();
 						}
 					}
 				}
 			}
 		}
+		return assigned_a_val;
 	}
 
 	//this method retrieves a vector with potential values of a given sector
@@ -421,8 +530,9 @@ private:
 	//this metthod assigns a value to the cell acourding to its potential values,
 	//if the potential_values vector only contains one element 
 	//that means only that value can be assigned at that cell
-	void update_cells_according_to_potentials()
+	bool update_cells_according_to_potentials()
 	{
+		bool assigned_a_val = false;
 		update_potentials();
 		for(int r = 0; r < RCS_SIZE; r++)
 		{
@@ -432,10 +542,13 @@ private:
 				{
 					_cells[r][c]._value = _cells[r][c]._potential_values[0];
 					_cells[r][c]._potential_values.clear();
+					_empty_cells--;
+					assigned_a_val = true;
 					update_cells_according_to_potentials();
 				}
 			}
 		}
+		return assigned_a_val;
 	}
 
 	//retrieves a vector with the missing values of the sector
@@ -491,14 +604,54 @@ private:
 		return false;
 	}
 
-	//checks if the puzzle has emptry cells (cells with 0)
+	//checks if  _empty_cells == 0
 	bool is_puzzle_solved()
 	{
-		for(int c = 0; c < RCS_SIZE; c++)
-			for(int r = 0; r < RCS_SIZE; r++)
+		return _empty_cells == 0;
+	}
+
+	//checks if the puzzle has emptry cells (cells with 0)
+	bool is_puzzle_really_solved()
+	{
+		for(int r = 0; r < RCS_SIZE; r++)
+			for(int c = 0; c < RCS_SIZE; c++)
 				if(_cells[r][c]._value == 0)
 					return false;
 		return true;
+	}
+
+	//makes a guess on a cell that has only 2 potential values
+	void make_a_guess()
+	{
+		for(int r = 0; r < RCS_SIZE; r++)
+		{
+			for(int c = 0; c < RCS_SIZE; c++)
+			{
+				bool made_a_guess = false;
+				if(_cells[r][c]._value == 0 && 
+					!_cells[r][c]._all_possible_guesses_have_been_made)
+				{
+					for(int i = 0; i < (int)_cells[r][c]._potential_values.size(); i++)
+					{
+						if(i > _lgs._last_index_checked)
+						{
+							_cells[r][c]._value = _cells[r][c]._potential_values[i];
+							_empty_cells--;
+							_lgs._last_index_checked = i;
+							made_a_guess = true;
+							break;
+						}
+					}
+					if(!made_a_guess)
+					{
+						_lgs._last_index_checked = -1;
+						_cells[r][c]._all_possible_guesses_have_been_made = true;
+					}
+					else
+						return;
+				}
+			}
+		}
 	}
 
 //-- methods pertinent to the actual puzzle solving end here ----------------------------------
@@ -533,6 +686,7 @@ private:
 					_cells[r][c]._sector = BOTTOM_RIGHT;
 
 				_cells[r][c]._position = position + offset;
+				_cells[r][c]._all_possible_guesses_have_been_made = false;
 				_cells[r][c]._row = r;
 				_cells[r][c]._col = c;
 				_cell_sectors[_cells[r][c]._sector][_cells[r][c]._position] = &_cells[r][c];
@@ -560,6 +714,9 @@ private:
 			if(!isdigit(row[c]))
 				return false;
 			_cells[index][c]._value = get_int_value(row[c]);
+			if(_cells[index][c]._value != 0){
+				_empty_cells--;
+			}
 		}
 		return true;
 	}
@@ -692,6 +849,8 @@ int main(int argc, char *argv[])
 	}
 
 	sd.print_puzzle();
+
+	system( "notepad.exe potentials.txt" );
 
 	return 1;
 }
