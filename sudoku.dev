@@ -21,13 +21,13 @@ OverrideOutput=0
 OverrideOutputName=sudoku.exe
 HostApplication=
 Folders=
-CommandLine=puzzle.txt
+CommandLine=
 UseCustomMakefile=0
 CustomMakefile=
 IncludeVersionInfo=0
 SupportXPThemes=0
 CompilerSet=0
-CompilerSettings=0000000000000001000000
+CompilerSettings=0000000000000000000000
 
 [Unit1]
 FileName=sudoku.cpp

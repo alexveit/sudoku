@@ -1,13 +1,13 @@
 #include <iostream>
 #include <iomanip>
-#include <fstream>
 #include <string>
+#include <fstream>
 #include <vector>
 
 using namespace std;
 
 
-//class responsable for solving a sudoku puzzle
+//class responsible for solving a sudoku puzzle
 class sudoku_puzzle
 {
 
@@ -32,10 +32,12 @@ public:
 	{
 		string row;
 		ifstream myfile(file);
-
+		
+		_potential_iterations = _single_position_iterations = _guesses = 0;
+		
 		_empty_cells = RCS_SIZE*RCS_SIZE;
 
-		set_cell_coordinates();
+		init_cells();
 
 		int index = 0;
 		if (myfile.is_open())
@@ -109,6 +111,7 @@ public:
 					_lgs.set_cells(_cells);
 				}
 				make_a_guess();
+				_guesses++;
 				have_i_guessed = true;
 			}
 		}while(!is_puzzle_really_solved());
@@ -207,6 +210,9 @@ public:
 					myfile << endl;
 			}
 		}
+		myfile << "potential iterations = " << _potential_iterations << endl;
+		myfile << "single position iterations = " << _single_position_iterations << endl;
+		myfile << "guesses = " << _guesses << endl;
 		myfile.close();
 	}
 
@@ -272,6 +278,9 @@ private:
 		cell _cells[RCS_SIZE][RCS_SIZE];
 	};
 
+	int		_guesses;
+	int		_single_position_iterations;
+	int		_potential_iterations;
 	bool 	_good_file;
 	string	_err_msg;
 	cell	_cells[RCS_SIZE][RCS_SIZE];
@@ -480,6 +489,7 @@ private:
 	bool update_cells_single_position()
 	{
 		bool assigned_a_val = false;
+		_single_position_iterations++;
 		for(int sec = 0; sec < RCS_SIZE; sec++)
 		{
 			for(int pos = 0; pos < RCS_SIZE; pos++)
@@ -533,6 +543,7 @@ private:
 	bool update_cells_according_to_potentials()
 	{
 		bool assigned_a_val = false;
+		_potential_iterations++;
 		update_potentials();
 		for(int r = 0; r < RCS_SIZE; r++)
 		{
@@ -659,7 +670,7 @@ private:
 //-- puzzle initialization methods start here -------------------------------------------------
 
 	//sets the sector, position, row, and column in each cell
-	void set_cell_coordinates()
+	void init_cells()
 	{
 		int position = 0, offset = 0;
 		for(int r = 0; r < RCS_SIZE; r++)
@@ -762,7 +773,6 @@ private:
 	//validates the row in a given array of cells
 	//a valid row is one that does not have repeated numbers
 	//except for 0 which denotes an empty cell
-	//the paramater issector is just to better address the error msg
 	bool is_valid_row(int row)
 	{
 		for(int c = 0; c < RCS_SIZE; c++)
